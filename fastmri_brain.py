@@ -1,5 +1,6 @@
 import h5py
 import os
+import cv2
 
 import numpy
 import numpy as np
@@ -276,6 +277,15 @@ def load_real_dataset_handle(
 
     return ret
 
+def gaussian_downsample(image, factor=4):
+    # Apply Gaussian blur
+    blurred = cv2.GaussianBlur(image, (5, 5), 0)
+    
+    # Downsample using slicing
+    downsampled = blurred[::factor, ::factor]
+    
+    return downsampled
+
 
 class RealMeasurement(Dataset):
     def __init__(
@@ -364,15 +374,21 @@ class FastMRIBrain(RealMeasurement):
             mask_pattern='uniformly_cartesian',
             smps_hat_method='eps'
         )
+    
+    def downsample(self, y):
+        y_sampled = gaussian_downsample(y, factor=self.acceleration_factor)
+        return y_sampled
+
 
     def __getitem__(self, item):
 
         x_gt, smps_gt, fully_sampled_y, _, file_idx, slice_idx = super().__getitem__(item)
-
+        y_sampled = self.downsample(fully_sampled_y)
         return {
             'x': x_gt,
             'smps': smps_gt,
             'y': fully_sampled_y,
+            "downsampled_y": y_sampled,
             'file_idx': file_idx,
             'slice_idx': slice_idx,
         }
